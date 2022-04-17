@@ -1,0 +1,11 @@
+{
+    "http://ros-node.dev.sd.sbauto.tech:8000/openapi.json": {
+        "endpoints": [
+            "/api/v1/nodes [get]",
+            "/api/v1/params [get]",
+            "/api/v1/set_state_bulk [patch]",
+            "/api/v1/set_state [patch]"
+        ],
+        "proxy-path": "rosnode"
+    }
+}

@@ -1,0 +1,23 @@
+/* This file was automatically generated. */
+import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
+
+/* PLACEHOLDER: imports */
+
+export type TDefinitionList = 'transformResponse' | 'providesTags' | 'onQueryStarted' | 'onCacheEntryAdded' | 'extraOptions' | 'invalidatesTags' | 'keepUnusedDataFor';
+
+export const api = createApi({
+    reducerPath: 'api',
+    baseQuery  : fetchBaseQuery({
+        baseUrl       : './api-rest',
+        prepareHeaders: (headers) => {
+            headers.set('cache-control', 'no-cache');
+
+            return headers;
+        }
+    }),
+    endpoints: (builder) => ({
+        // PLACEHOLDER: endpoints
+    })
+});
+
+export default api;

@@ -1,0 +1,15 @@
+{
+  "name": "gena",
+  "version": "0.1.0",
+  "author": "Aleksey Novikov <asernovikov@sberbank.ru>",
+  "license": "MIT",
+  "scripts": {
+    "generate": "plop --plopfile=./.plop/index.js"
+  },
+  "devDependencies": {
+    "@apidevtools/swagger-parser": "10.0.3",
+    "inquirer-checkbox-plus-prompt": "1.0.1",
+    "json-schema-to-typescript": "10.1.5",
+    "plop": "3.0.5"
+  }
+}
