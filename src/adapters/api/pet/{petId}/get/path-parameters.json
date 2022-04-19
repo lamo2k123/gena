@@ -1,0 +1,13 @@
+{
+    "properties": {
+        "petId": {
+            "type": "integer",
+            "format": "int64"
+        }
+    },
+    "required": [
+        "petId"
+    ],
+    "type": "object",
+    "additionalProperties": false
+}

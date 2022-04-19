@@ -1,0 +1,13 @@
+{
+    "properties": {
+        "tags": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            }
+        }
+    },
+    "required": [],
+    "type": "object",
+    "additionalProperties": false
+}

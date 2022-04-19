@@ -1,24 +1,24 @@
-const { readFileSync } = require('fs');
+const { readFileSync, existsSync } = require('fs');
 const { join, normalize } = require('path');
 const SwaggerParser = require('@apidevtools/swagger-parser');
 const Ajv = require('ajv');
 const { compile } = require('json-schema-to-typescript');
 const { ESLint } = require('eslint');
 
-const config = require('./config.json');
+const config = existsSync(join(__dirname, './config.json')) ? require('./config.json') : {};
 
 const OUTPUT = join(__dirname, './../../../src/adapters/api');
 
 const normalizeJSON = (json) => {
     if(typeof json === 'object' && json !== null) {
-        if(json.type === 'object') {
+        if(json.type === 'object' && json.additionalProperties === undefined) {
             json.additionalProperties = false;
         }
 
         const keys = Object.keys(json);
 
         for(const key of keys) {
-            if(key === 'title' || json[key]?.additionalProperties === false) {
+            if(key === 'title'/* || json[key]?.additionalProperties === false*/) {
                 delete json[key];
             }
 
@@ -31,7 +31,8 @@ const normalizeJSON = (json) => {
 
 module.exports = (plop) => {
     const helpers = {
-        camelCase: plop.getHelper('camelCase')
+        camelCase : plop.getHelper('camelCase'),
+        pascalCase: plop.getHelper('pascalCase'),
     };
 
     const store = {
@@ -95,7 +96,7 @@ module.exports = (plop) => {
                         pageSize  : 12,
                         highlight : true,
                         searchable: true,
-                        default   : config[store.target].endpoints,
+                        default   : config[store.target]?.endpoints || [],
                         source    : async (answers, input = '') => {
                             return store.endpoints.map(({ name }) => name).filter((name) => name.includes(input.toLowerCase()));
                         }
@@ -108,12 +109,13 @@ module.exports = (plop) => {
                     });
             }
 
-            if(!config[store.target]?.['proxy-path']) {
+            if(!config[store.target]?.['prefix']) {
                 await inquirer
                     .prompt([{
                         type   : 'input',
-                        name   : 'proxy-path',
-                        message: 'Укажите прокси путь:',
+                        name   : 'prefix',
+                        message: 'Укажите префикс:',
+                        default: '/',
                         validate: (input) => !!input
                     }])
                     .then((payload) => {
@@ -123,7 +125,7 @@ module.exports = (plop) => {
                         }
                     });
             } else {
-                store.answers[store.target]['proxy-path'] = config[store.target]['proxy-path'];
+                store.answers[store.target]['prefix'] = config[store.target]['prefix'];
             }
 
             if(JSON.stringify(config) !== JSON.stringify(store.answers)) {
@@ -187,14 +189,17 @@ module.exports = (plop) => {
                                     }
                                 });
 
-                            if(item.method === 'get') {
-                                if(endpoint.parameters) {
-                                    const schema = endpoint.parameters.reduce((accumulator, current) => {
+                            if(endpoint.parameters) {
+                                const inPath = endpoint.parameters.filter((item) => item.in === 'path');
+                                const inQuery = endpoint.parameters.filter((item) => item.in === 'query');
+
+                                if(inPath.length) {
+                                    accumulator[item.endpoint][item.method]['path-parameters'] = inPath.reduce((accumulator, current) => {
                                         if(current.required) {
                                             accumulator.required.push(current.name);
                                         }
 
-                                        accumulator.properties[current.name] = { type: current.schema.type };
+                                        accumulator.properties[current.name] = current.schema;
 
                                         return accumulator;
                                     }, {
@@ -202,18 +207,30 @@ module.exports = (plop) => {
                                         required  : [],
                                         type      : 'object'
                                     });
-
-                                    if(schema) {
-                                        accumulator[item.endpoint][item.method]['parameters'] = schema;
-                                    }
                                 }
-                            } else if(item.method === 'post' || item.method === 'patch') {
-                                if(endpoint?.requestBody?.content?.['application/json']?.schema) {
-                                    const schema = endpoint.requestBody?.content?.['application/json']?.schema;
 
-                                    if(schema) {
-                                        accumulator[item.endpoint][item.method]['parameters'] = schema;
-                                    }
+                                if(inQuery.length) {
+                                    accumulator[item.endpoint][item.method]['query-parameters'] = inQuery.reduce((accumulator, current) => {
+                                        if(current.required) {
+                                            accumulator.required.push(current.name);
+                                        }
+
+                                        accumulator.properties[current.name] = current.schema;
+
+                                        return accumulator;
+                                    }, {
+                                        properties: {},
+                                        required  : [],
+                                        type      : 'object'
+                                    });
+                                }
+                            }
+
+                            if(endpoint?.requestBody?.content?.['application/json']?.schema) {
+                                const schema = endpoint.requestBody?.content?.['application/json']?.schema;
+
+                                if(schema) {
+                                    accumulator[item.endpoint][item.method]['body-parameters'] = schema;
                                 }
                             }
                         }
@@ -253,14 +270,14 @@ module.exports = (plop) => {
                     for(const path in store.collector) {
                         for(const method in store.collector[path]) {
                             const types = [];
-                            const importPath = normalize(`${store.answers[store.target]['proxy-path']}/${path}/${method}`);
+                            const importPath = normalize(`${store.answers[store.target]['prefix']}/${path}/${method}`);
                             const nameFunction = helpers.camelCase(importPath.replace(/all/, ''));
 
                             for(const key in store.collector[path][method]) {
                                 const prefix = store.collector[path][method][key].type === 'object' ? 'i' : 't';
 
                                 types.push(
-                                    await compile(store.collector[path][method][key], Number(key) ? `${prefix}-code-${key}` : `${prefix}-${key}`, {
+                                    await compile(JSON.parse(JSON.stringify(store.collector[path][method][key])), Number(key) ? `${prefix}-code-${key}` : `${prefix}-${key}`, {
                                         bannerComment         : '',
                                         unreachableDefinitions: true,
                                         strictIndexSignatures : true,
@@ -273,12 +290,13 @@ module.exports = (plop) => {
                                 );
 
                                 result.push({
-                                    path    : join(OUTPUT, store.answers[store.target]['proxy-path'], path, method, `${key}.json`),
+                                    path    : join(OUTPUT, store.answers[store.target]['prefix'], path, method, `${key}.json`),
                                     template: JSON.stringify(store.collector[path][method][key], null, 4),
                                     type    : 'add',
                                     force   : true
                                 });
                             }
+
 
                             const importTemplate = `import { ${nameFunction} } from './${importPath}';`;
 
@@ -304,20 +322,44 @@ module.exports = (plop) => {
                                 });
                             }
 
+                            const Code200Prefix = store.collector[path][method]['200']?.type === 'object' ? 'I' : 'T';
+                            const queryKeys = Object.keys(store.collector[path][method]['query-parameters']?.properties || []);
+                            const bodyKeys = Object.keys(store.collector[path][method]['body-parameters']?.properties || []);
+                            const typeParameters = ['path', 'query', 'body'].filter((item) => store.collector[path][method][`${item}-parameters`]).map((name) => helpers.pascalCase(`i-${name}-parameters`)).join(' & ');
+
                             result.push({
-                                path        : join(OUTPUT, store.answers[store.target]['proxy-path'], path, method, 'index.ts'),
+                                path        : join(OUTPUT, store.answers[store.target]['prefix'], path, method, 'index.ts'),
                                 templateFile: './generators/api/templates/endpoint.ts.hbs',
                                 type        : 'add',
                                 force       : true,
                                 data        : {
-                                    types        : types.join('\n').trim(),
-                                    method       : method.toUpperCase(),
-                                    endpoint     : normalize(`/${store.answers[store.target]['proxy-path'] + path}`),
+                                    nameFunction,
+                                    namePayload   : ['PATCH', 'PUT', 'POST', 'DELETE'].includes(method.toUpperCase()) ? 'body' : 'params',
+                                    typeResponse  : !!store.collector[path][method]['200'] ? `${Code200Prefix}Code200` : 'void',
+                                    typeParameters: typeParameters || 'void',
+                                    builderMethod : ['PATCH', 'PUT', 'POST', 'DELETE'].includes(method.toUpperCase()) ? 'mutation' : 'query',
+                                    method        : method.toUpperCase(),
+                                    types         : types.join('\n').trim(),
+                                    endpoint      : normalize(`/${store.answers[store.target]['prefix'] + path}`).replace(/\{([a-z_-]+)\}/gi, '${params.path' + (store.collector[path][method]['path-parameters']?.required?.length ? '' : '?') +'.$1}'),
+                                    paramsPayload : !queryKeys.length ? 'undefined' : '{' + queryKeys.reduce((acc, key) => {
+                                        acc += `${key}: params.query${store.collector[path][method]['query-parameters'].required.length ? '' : '?'}.${key},`;
+
+                                        return acc;
+                                    }, '') + '}',
+                                    bodyPayload : !store.collector[path][method]['body-parameters'] ? 'undefined' : store.collector[path][method]['body-parameters'].type === 'object' ? !bodyKeys.length ? 'undefined' : '{' + bodyKeys.reduce((acc, key) => {
+                                        acc += `${key}: params.body${store.collector[path][method]['body-parameters']?.required?.length ? '' : '?'}.${key},`;
+
+                                        return acc;
+                                    }, '') + '}' : 'params.body',
+                                    typePathParameters: store.collector[path][method]['path-parameters'] ? `path${store.collector[path][method]['path-parameters'].required?.length ? '' : '?'}: ${store.collector[path][method]['path-parameters'].type === 'object' ? 'I' : 'T'}PathParameters,` : '',
+                                    typeQueryParameters: store.collector[path][method]['query-parameters'] ? `query${store.collector[path][method]['query-parameters'].required?.length ? '' : '?'}: ${store.collector[path][method]['query-parameters'].type === 'object' ? 'I' : 'T'}QueryParameters,` : '',
+                                    typeBodyParameters: store.collector[path][method]['body-parameters'] ? `body${store.collector[path][method]['body-parameters'].required?.length ? '' : '?'}: ${store.collector[path][method]['body-parameters'].type === 'object' ? 'I' : 'T'}BodyParameters,` : '',
+                                    isParameters  : !!typeParameters,
+/*
                                     isMutation   : ['PATCH', 'PUT', 'POST', 'DELETE'].includes(method.toUpperCase()),
                                     isCode200    : !!store.collector[path][method]['200'],
                                     prefixCode200: store.collector[path][method]['200']?.type === 'object' ? 'I' : 'T',
-                                    isParameters : !!store.collector[path][method].parameters,
-                                    nameFunction
+*/
                                 }
                             });
                         }

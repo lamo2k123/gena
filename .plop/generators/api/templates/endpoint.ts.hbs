@@ -3,36 +3,26 @@
     DO NOT MODIFY IT BY HAND
     Instead, modify the source.
 */
-import { EndpointBuilder, {{#if isMutation}}MutationDefinition{{else}}QueryDefinition{{/if}} } from '@reduxjs/toolkit/dist/query/endpointDefinitions';
+import { EndpointBuilder } from '@reduxjs/toolkit/dist/query/endpointDefinitions';
 import { BaseQueryFn } from '@reduxjs/toolkit/dist/query/baseQueryTypes';
-import { FetchArgs } from '@reduxjs/toolkit/src/query/fetchBaseQuery';
-
-import type { TDefinitionList } from 'adapter/api';
 
 {{#if types}}
 {{{types}}}
 
 {{/if}}
-export const {{nameFunction}} = <TResponse = {{#if isCode200}}{{prefixCode200}}Code200{{else}}void{{/if}}, TParams = {{#if isParameters}}IParameters{{else}}void{{/if}}>(builder: EndpointBuilder<BaseQueryFn, string, string>, options?: Omit<FetchArgs, 'url'>, definition?: Pick<{{#if isMutation}}MutationDefinition{{else}}QueryDefinition{{/if}}<TParams, BaseQueryFn<TParams, {{#if isCode200}}{{prefixCode200}}Code200{{else}}void{{/if}}>, string, TResponse>, {{#if isMutation}}TDefinitionList{{else}}TDefinitionList | 'keepUnusedDataFor'{{/if}}>) => {
-    {{#if isMutation}}
-    return builder.mutation<TResponse, TParams>({
-        query: ({{#if isParameters}}body{{/if}}) => ({
-            ...options,
-            url   : '{{endpoint}}',
-            method: '{{method}}'{{#if isParameters}},
-            body{{/if}}
-        }),
-        ...definition
-    });
-    {{else}}
-    return builder.query<TResponse, TParams>({
+export interface IParameters {
+    {{~typePathParameters~}}
+    {{~typeQueryParameters~}}
+    {{~typeBodyParameters~}}
+}
+
+export const {{nameFunction}} = <TResponse extends {{typeResponse}}, TParams extends IParameters>(builder: EndpointBuilder<BaseQueryFn, string, string>) => {
+    return builder.{{builderMethod}}<TResponse, TParams>({
         query: ({{#if isParameters}}params{{/if}}) => ({
-            ...options,
-            url   : '{{endpoint}}',
-            method: '{{method}}'{{#if isParameters}},
-            params{{/if}}
-        }),
-        ...definition
+            url   : `{{endpoint}}`,
+            method: '{{method}}',
+            params: {{paramsPayload}},
+            body  : {{bodyPayload}}
+        })
     });
-    {{/if}}
 };

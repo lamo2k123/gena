@@ -1,0 +1,16 @@
+{
+    "properties": {
+        "status": {
+            "type": "string",
+            "default": "available",
+            "enum": [
+                "available",
+                "pending",
+                "sold"
+            ]
+        }
+    },
+    "required": [],
+    "type": "object",
+    "additionalProperties": false
+}

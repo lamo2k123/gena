@@ -1,0 +1,13 @@
+{
+    "properties": {
+        "orderId": {
+            "type": "integer",
+            "format": "int64"
+        }
+    },
+    "required": [
+        "orderId"
+    ],
+    "type": "object",
+    "additionalProperties": false
+}

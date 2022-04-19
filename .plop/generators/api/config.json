@@ -1,11 +1,26 @@
 {
-    "http://ros-node.dev.sd.sbauto.tech:8000/openapi.json": {
+    "https://petstore3.swagger.io/api/v3/openapi.json": {
         "endpoints": [
-            "/api/v1/nodes [get]",
-            "/api/v1/params [get]",
-            "/api/v1/set_state_bulk [patch]",
-            "/api/v1/set_state [patch]"
+            "/pet [put]",
+            "/pet [post]",
+            "/pet/findByStatus [get]",
+            "/pet/findByTags [get]",
+            "/pet/{petId} [get]",
+            "/pet/{petId} [post]",
+            "/pet/{petId}/uploadImage [post]",
+            "/store/inventory [get]",
+            "/store/order [post]",
+            "/store/order/{orderId} [get]",
+            "/user [post]",
+            "/user/createWithList [post]",
+            "/user/login [get]",
+            "/user/logout [get]",
+            "/user/{username} [get]",
+            "/pet/{petId} [delete]",
+            "/store/order/{orderId} [delete]",
+            "/user/{username} [put]",
+            "/user/{username} [delete]"
         ],
-        "proxy-path": "rosnode"
+        "prefix": "/"
     }
 }
